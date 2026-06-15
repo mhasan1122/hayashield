@@ -1,9 +1,14 @@
 package expo.modules.hayashieldnative
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Intent
 import android.net.VpnService
+import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
+import androidx.core.app.NotificationCompat
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -21,6 +26,8 @@ class HayaShieldVpnService : VpnService(), Runnable {
 
     companion object {
         const val TAG = "HayaShieldVpn"
+        private const val NOTIFICATION_ID = 1001
+        private const val CHANNEL_ID = "haya_shield_vpn"
         var isRunning = false
         private var blockedDomains = setOf<String>()
 
@@ -61,6 +68,12 @@ class HayaShieldVpnService : VpnService(), Runnable {
 
     private fun startVpn() {
         if (running) return
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            createNotificationChannel()
+            startForeground(NOTIFICATION_ID, buildNotification())
+        }
+
         running = true
         isRunning = true
         vpnThread = Thread(this, "HayaShieldVpnThread").apply { start() }
@@ -75,7 +88,39 @@ class HayaShieldVpnService : VpnService(), Runnable {
         vpnInterface = null
         vpnThread?.interrupt()
         vpnThread = null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        }
         Log.d(TAG, "VPN Service stopped")
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Haya Shield VPN",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Shows when DNS filtering is active"
+                setShowBadge(false)
+            }
+            val manager = getSystemService(NotificationManager::class.java)
+            manager?.createNotificationChannel(channel)
+        }
+    }
+
+    private fun buildNotification(): Notification {
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Haya Shield Active")
+            .setContentText("DNS filtering is protecting your device")
+            .setSmallIcon(R.drawable.ic_shield_notification)
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .build()
     }
 
     override fun run() {

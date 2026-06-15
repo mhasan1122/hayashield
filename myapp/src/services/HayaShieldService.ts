@@ -12,6 +12,13 @@ export interface BlockedDomainEvent {
 
 const HayaShieldService = {
   /**
+   * Whether the native Android module is available (false in Expo Go / web).
+   */
+  isNativeAvailable(): boolean {
+    return HayaShieldNativeModule != null;
+  },
+
+  /**
    * Check if VPN permission is granted.
    */
   checkVpnPermission(): boolean {

@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Share, Platform } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Share, Platform, Alert, AppState, AppStateStatus } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppSelector, useAppDispatch } from '../hooks/storeHooks';
 import { setVpnEnabled } from '../store/slices';
@@ -20,29 +20,76 @@ export default function DashboardScreen({ onNavigateToTab }: DashboardProps) {
 
   // Daily Ayah
   const [dailyAyah, setDailyAyah] = useState<QuranVerse | null>(null);
+  const [awaitingVpnPermission, setAwaitingVpnPermission] = useState(false);
+
+  const syncVpnState = useCallback(() => {
+    if (HayaShieldService.isNativeAvailable() && HayaShieldService.isVpnEnabled()) {
+      dispatch(setVpnEnabled(true));
+    }
+  }, [dispatch]);
 
   useEffect(() => {
     setDailyAyah(getRandomAyah());
-  }, []);
+    syncVpnState();
+  }, [syncVpnState]);
+
+  // After user grants VPN permission in system dialog, auto-start shield on return
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState !== 'active' || !awaitingVpnPermission) return;
+
+      setAwaitingVpnPermission(false);
+      if (HayaShieldService.checkVpnPermission()) {
+        HayaShieldService.setBlockedDomains(blockedDomains);
+        HayaShieldService.startVpn();
+        const started = HayaShieldService.isVpnEnabled();
+        dispatch(setVpnEnabled(started));
+        if (!started) {
+          Alert.alert('Shield failed to start', 'Please try enabling the shield again.');
+        }
+      }
+    };
+
+    const sub = AppState.addEventListener('change', handleAppStateChange);
+    return () => sub.remove();
+  }, [awaitingVpnPermission, blockedDomains, dispatch]);
 
   const toggleProtection = async () => {
     try {
       if (vpnEnabled) {
         HayaShieldService.stopVpn();
         dispatch(setVpnEnabled(false));
-      } else {
-        // Sync blocklist to native file before starting
-        HayaShieldService.setBlockedDomains(blockedDomains);
-        const hasPermission = HayaShieldService.checkVpnPermission();
-        if (hasPermission) {
-          HayaShieldService.startVpn();
-          dispatch(setVpnEnabled(true));
-        } else {
-          HayaShieldService.requestVpnPermission();
+        return;
+      }
+
+      if (!HayaShieldService.isNativeAvailable()) {
+        Alert.alert(
+          'Development Build Required',
+          'The shield needs a native Android build. It does not work in Expo Go. Run: npx expo run:android'
+        );
+        return;
+      }
+
+      HayaShieldService.setBlockedDomains(blockedDomains);
+
+      if (HayaShieldService.checkVpnPermission()) {
+        HayaShieldService.startVpn();
+        const started = HayaShieldService.isVpnEnabled();
+        dispatch(setVpnEnabled(started));
+        if (!started) {
+          Alert.alert('Shield failed to start', 'The VPN service could not start. Please try again.');
         }
+      } else {
+        setAwaitingVpnPermission(true);
+        HayaShieldService.requestVpnPermission();
+        Alert.alert(
+          'VPN Permission Required',
+          'Tap OK, then approve the VPN connection on the next screen. The shield will turn on automatically when you return.'
+        );
       }
     } catch (e) {
       console.log('Error toggling VPN', e);
+      Alert.alert('Error', 'Something went wrong while toggling the shield.');
     }
   };
 

@@ -1,0 +1,4 @@
+expo.modules.hayashieldnative
+drawable ic_shield_notification
+string accessibility_service_description
+xml accessibility_service_config

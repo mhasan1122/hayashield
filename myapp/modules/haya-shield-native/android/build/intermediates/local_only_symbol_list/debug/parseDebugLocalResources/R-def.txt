@@ -1,0 +1,5 @@
+R_DEF: Internal format may change without notice
+local
+drawable ic_shield_notification
+string accessibility_service_description
+xml accessibility_service_config

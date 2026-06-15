@@ -58,32 +58,43 @@ class HayaShieldNativeModule : Module() {
     }
 
     Function("requestVpnPermission") {
-      val context = appContext.reactContext ?: return@Function
-      val intent = VpnService.prepare(context)
-      if (intent != null) {
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        appContext.currentActivity?.startActivity(intent)
+      val context = appContext.reactContext
+      if (context != null) {
+        val intent = VpnService.prepare(context)
+        if (intent != null) {
+          intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+          val activity = appContext.currentActivity
+          if (activity != null) {
+            activity.startActivity(intent)
+          } else {
+            context.startActivity(intent)
+          }
+        }
       }
     }
 
     Function("startVpn") {
-      val context = appContext.reactContext ?: return@Function
-      val intent = Intent(context, HayaShieldVpnService::class.java).apply {
-        action = "START"
-      }
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        context.startForegroundService(intent)
-      } else {
-        context.startService(intent)
+      val context = appContext.reactContext
+      if (context != null) {
+        val intent = Intent(context, HayaShieldVpnService::class.java).apply {
+          action = "START"
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+          context.startForegroundService(intent)
+        } else {
+          context.startService(intent)
+        }
       }
     }
 
     Function("stopVpn") {
-      val context = appContext.reactContext ?: return@Function
-      val intent = Intent(context, HayaShieldVpnService::class.java).apply {
-        action = "STOP"
+      val context = appContext.reactContext
+      if (context != null) {
+        val intent = Intent(context, HayaShieldVpnService::class.java).apply {
+          action = "STOP"
+        }
+        context.startService(intent)
       }
-      context.startService(intent)
     }
 
     Function("isVpnEnabled") {
@@ -102,32 +113,38 @@ class HayaShieldNativeModule : Module() {
     }
 
     Function("openAccessibilitySettings") {
-      val context = appContext.reactContext ?: return@Function
-      val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+      val context = appContext.reactContext
+      if (context != null) {
+        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+          flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        context.startActivity(intent)
       }
-      context.startActivity(intent)
     }
 
     // Blocklist configuration
     Function("setBlockedDomains") { domains: List<String> ->
-      val context = appContext.reactContext ?: return@Function
-      val file = File(context.filesDir, "blocked_domains.json")
-      try {
-        val json = domains.joinToString(prefix = "[", postfix = "]", separator = ",") { "\"$it\"" }
-        file.writeText(json)
-        HayaShieldVpnService.setBlockedDomains(domains.toSet())
-      } catch (e: Exception) {}
+      val context = appContext.reactContext
+      if (context != null) {
+        val file = File(context.filesDir, "blocked_domains.json")
+        try {
+          val json = domains.joinToString(prefix = "[", postfix = "]", separator = ",") { "\"$it\"" }
+          file.writeText(json)
+          HayaShieldVpnService.setBlockedDomains(domains.toSet())
+        } catch (e: Exception) {}
+      }
     }
 
     Function("setBlockedApps") { apps: List<String> ->
-      val context = appContext.reactContext ?: return@Function
-      val file = File(context.filesDir, "blocked_apps.json")
-      try {
-        val json = apps.joinToString(prefix = "[", postfix = "]", separator = ",") { "\"$it\"" }
-        file.writeText(json)
-        HayaShieldAccessibilityService.setBlockedApps(apps.toSet())
-      } catch (e: Exception) {}
+      val context = appContext.reactContext
+      if (context != null) {
+        val file = File(context.filesDir, "blocked_apps.json")
+        try {
+          val json = apps.joinToString(prefix = "[", postfix = "]", separator = ",") { "\"$it\"" }
+          file.writeText(json)
+          HayaShieldAccessibilityService.setBlockedApps(apps.toSet())
+        } catch (e: Exception) {}
+      }
     }
 
     Function("setFocusMode") { enabled: Boolean, endTime: Double, apps: List<String> ->
@@ -149,7 +166,7 @@ class HayaShieldNativeModule : Module() {
       
       for (pkg in apps) {
         val launchIntent = pm.getLaunchIntentForPackage(pkg.packageName) ?: continue
-        val appInfo = pkg.applicationInfo
+        val appInfo = pkg.applicationInfo ?: continue
         val name = pm.getApplicationLabel(appInfo).toString()
         appList.add(mapOf(
           "packageName" to pkg.packageName,
