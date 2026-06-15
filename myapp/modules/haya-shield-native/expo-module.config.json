@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android", "web"],
+  "apple": {
+    "modules": ["HayaShieldNativeModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.hayashieldnative.HayaShieldNativeModule"]
+  }
+}
