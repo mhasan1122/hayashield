@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_service_description">Haya Shield App Blocker monitors active windows to protect you and prevent selected distracting or harmful applications from opening.</string>
+</resources>
